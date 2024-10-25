@@ -112,6 +112,7 @@ const (
 	preparedStatementName   = "_trino_go"
 
 	trinoUserHeader            = trinoHeaderPrefix + `User`
+	trinoQueryNameHeader       = trinoHeaderPrefix + `Query-Name`
 	trinoSourceHeader          = trinoHeaderPrefix + `Source`
 	trinoCatalogHeader         = trinoHeaderPrefix + `Catalog`
 	trinoSchemaHeader          = trinoHeaderPrefix + `Schema`
@@ -899,6 +900,10 @@ func (st *driverStmt) exec(ctx context.Context, args []driver.NamedValue) (*stmt
 
 	if len(args) > 0 {
 		var ss []string
+		queryName := preparedStatementName
+		if queryNameHeader := ctx.Value(trinoQueryNameHeader); queryNameHeader != nil {
+			queryName = fmt.Sprint(queryNameHeader)
+		}
 		for _, arg := range args {
 			if arg.Name == trinoProgressCallbackParam {
 				st.conn.progressUpdater = arg.Value.(ProgressUpdater)
@@ -927,7 +932,7 @@ func (st *driverStmt) exec(ctx context.Context, args []driver.NamedValue) (*stmt
 					for _, v := range st.conn.httpHeaders.Values(preparedStatementHeader) {
 						hs.Add(preparedStatementHeader, v)
 					}
-					hs.Add(preparedStatementHeader, preparedStatementName+"="+url.QueryEscape(st.query))
+					hs.Add(preparedStatementHeader, queryName+"="+url.QueryEscape(st.query))
 				}
 				ss = append(ss, s)
 			}
@@ -937,7 +942,7 @@ func (st *driverStmt) exec(ctx context.Context, args []driver.NamedValue) (*stmt
 		}
 		if len(ss) > 0 {
 			if st.conn.useExplicitPrepare {
-				query = "EXECUTE " + preparedStatementName + " USING " + strings.Join(ss, ", ")
+				query = "EXECUTE " + queryName + " USING " + strings.Join(ss, ", ")
 			} else {
 				query = "EXECUTE IMMEDIATE " + formatStringLiteral(st.query) + " USING " + strings.Join(ss, ", ")
 			}
@@ -1109,12 +1114,14 @@ type driverRows struct {
 	doneCh  chan struct{}
 }
 
-var _ driver.Rows = &driverRows{}
-var _ driver.Result = &driverRows{}
-var _ driver.RowsColumnTypeScanType = &driverRows{}
-var _ driver.RowsColumnTypeDatabaseTypeName = &driverRows{}
-var _ driver.RowsColumnTypeLength = &driverRows{}
-var _ driver.RowsColumnTypePrecisionScale = &driverRows{}
+var (
+	_ driver.Rows                           = &driverRows{}
+	_ driver.Result                         = &driverRows{}
+	_ driver.RowsColumnTypeScanType         = &driverRows{}
+	_ driver.RowsColumnTypeDatabaseTypeName = &driverRows{}
+	_ driver.RowsColumnTypeLength           = &driverRows{}
+	_ driver.RowsColumnTypePrecisionScale   = &driverRows{}
+)
 
 // Close closes the rows iterator.
 func (qr *driverRows) Close() error {
