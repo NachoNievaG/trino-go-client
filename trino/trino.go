@@ -1139,6 +1139,7 @@ func (qr *driverRows) Close() error {
 	if err != nil {
 		return err
 	}
+	time.Sleep(200 * time.Millisecond)
 	resp, err := qr.stmt.conn.roundTrip(ctx, req)
 	if err != nil {
 		qferr, ok := err.(*ErrQueryFailed)
